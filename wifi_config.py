@@ -1,0 +1,6 @@
+SSID = ''
+KEY = ''
+IP = ''
+MASK = ''
+GATEWAY = ''
+DNS = ''
