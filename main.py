@@ -28,21 +28,23 @@ def connect_wifi():
 
 
 def get_planes():
-    planes = {}
+    data = {}
     planes_around = []
     try:
         response = urequests.get(URL)
-        planes = response.json()
+        data = response.json()
         response.close()
     except Exception as e:
         print("An error occurred while connecting to the API:", e)
 
-    for plane in planes['ac']:
-        callsign = plane.get('flight')
+    planes = data['ac']
+    planes.sort(key=lambda x: x['dst'])
+    for plane in planes:
+        callsign = plane.get('flight', 'empty')
         reg = plane.get('r', 'empty')
-        planes_around.append((callsign, reg))
+        distance = plane.get('dst', '999')  # planes without "dst" will be at the end of the list after sorting
+        planes_around.append((callsign, reg, distance))
     return planes_around
-
 
 if __name__ == '__main__':
     display = PicoGraphics(display=DISPLAY_PICO_DISPLAY, pen_type=PEN_P4, rotate=0)
@@ -58,19 +60,19 @@ if __name__ == '__main__':
 
     while True:
         clear_display()
-        planes_around = get_planes()
+        planes = get_planes()
         display.set_pen(GREEN)
         nm_to_km = RADIUS * 1.852
-        text = f"Planes around you\n within a {round(nm_to_km)} km radius: {len(planes_around)}"
+        text = f"Planes around you\n within a {round(nm_to_km)} km radius: {len(planes)}"
         print(text)
         display.text(text, 10, 10, 240, 2)
-        print(planes_around)
+        print(planes)
         Y = 50
         display.set_pen(WHITE)
-        if planes_around:
-            for plane in planes_around:
-                callsign, reg = plane
-                text = f"{callsign} - {reg}"
+        if planes:
+            for plane in planes:
+                callsign, reg, distance = plane
+                text = f"{callsign} - {reg} - {round(distance * 1.852)}"
                 display.text(text, 10, Y, 240, 2)
                 print(text)
                 Y += 20
