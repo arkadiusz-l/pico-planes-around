@@ -30,5 +30,5 @@ After restarting the Pico the program will automatically start from the `main.py
 I think the code should work with [Pico 2](https://www.raspberrypi.com/products/raspberry-pi-pico-2) as well.\
 If you want to use a different display you will have to adapt the code to its resolution etc.
 
-### History
+## History
 I like watching planes through binoculars/telescope and taking pictures of them, so I wanted to know what was flying around.
