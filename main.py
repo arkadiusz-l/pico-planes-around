@@ -38,8 +38,8 @@ def get_planes():
         print("An error occurred while connecting to the API:", e)
 
     for plane in planes['ac']:
-        callsign = plane['flight']
-        reg = plane['r']
+        callsign = plane.get('flight')
+        reg = plane.get('r', 'empty')
         planes_around.append((callsign, reg))
     return planes_around
 
@@ -67,11 +67,12 @@ if __name__ == '__main__':
         print(planes_around)
         Y = 50
         display.set_pen(WHITE)
-        for plane in planes_around:
-            callsign, reg = plane
-            text = f"{callsign} - {reg}"
-            display.text(text, 10, Y, 240, 2)
-            print(callsign, reg)
-            Y += 20
+        if planes_around:
+            for plane in planes_around:
+                callsign, reg = plane
+                text = f"{callsign} - {reg}"
+                display.text(text, 10, Y, 240, 2)
+                print(text)
+                Y += 20
         display.update()
         sleep(INTERVAL)
