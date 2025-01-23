@@ -40,7 +40,7 @@ def get_planes():
     planes = data['ac']
     planes.sort(key=lambda x: x['dst'])
     for plane in planes:
-        callsign = plane.get('flight', 'empty')
+        callsign = plane.get('flight', 'empty').rstrip()
         reg = plane.get('r', 'empty')
         distance = plane.get('dst', '999')  # planes without "dst" will be at the end of the list after sorting
         planes_around.append((callsign, reg, distance))
@@ -53,6 +53,9 @@ if __name__ == '__main__':
     WHITE = display.create_pen(255, 255, 255)
     BLACK = display.create_pen(0, 0, 0)
     GREEN = display.create_pen(0, 255, 0)
+    CYAN = display.create_pen(0, 255, 255)
+    MAGENTA = display.create_pen(255, 0, 255)
+    YELLOW = display.create_pen(255, 255, 0)
 
     connect_wifi()
 
@@ -65,15 +68,19 @@ if __name__ == '__main__':
         nm_to_km = RADIUS * 1.852
         text = f"Planes around you\n within a {round(nm_to_km)} km radius: {len(planes)}"
         print(text)
-        display.text(text, 10, 10, 240, 2)
+        display.text(text, 0, 0, 240, 2)
         print(planes)
         Y = 50
         display.set_pen(WHITE)
         if planes:
             for plane in planes:
                 callsign, reg, distance = plane
-                text = f"{callsign} - {reg} - {round(distance * 1.852)}"
-                display.text(text, 10, Y, 240, 2)
+                display.set_pen(CYAN)
+                display.text(callsign, 0, Y, 80, 2)
+                display.set_pen(MAGENTA)
+                display.text(reg, 90, Y, 80, 2)
+                display.set_pen(YELLOW)
+                display.text(f"{round(distance * 1.852)} km", 175, Y, 80, 2)
                 print(text)
                 Y += 20
         display.update()
