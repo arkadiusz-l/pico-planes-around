@@ -1,5 +1,5 @@
 import network
-from time import sleep
+from utime import sleep
 from pimoroni import RGBLED
 from picographics import PicoGraphics, DISPLAY_PICO_DISPLAY, PEN_P4
 import urequests
