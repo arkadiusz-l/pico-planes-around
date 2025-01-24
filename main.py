@@ -1,5 +1,6 @@
 import network
 from time import sleep
+from pimoroni import RGBLED
 from picographics import PicoGraphics, DISPLAY_PICO_DISPLAY, PEN_P4
 import urequests
 from wifi_config import SSID, KEY, IP, MASK, GATEWAY, DNS
@@ -10,6 +11,7 @@ def clear_display():
     display.set_pen(BLACK)
     display.clear()
     display.update()
+    led.set_rgb(0, 0, 0)
 
 
 def connect_wifi():
@@ -40,16 +42,21 @@ def get_planes():
     planes = data['ac']
     planes.sort(key=lambda x: x['dst'])
     for plane in planes:
+        type = plane.get('t', 'empty')
         callsign = plane.get('flight', 'empty').rstrip()
         reg = plane.get('r', 'empty')
         distance = plane.get('dst', '999')  # planes without "dst" will be at the end of the list after sorting
-        planes_around.append((callsign, reg, distance))
+        direction = plane.get('dir', 'empty')
+        planes_around.append((type, callsign, reg, distance, direction))
     return planes_around
 
 if __name__ == '__main__':
     display = PicoGraphics(display=DISPLAY_PICO_DISPLAY, pen_type=PEN_P4, rotate=0)
     display.set_backlight(0.5)
     display.set_font("bitmap8")
+
+    led = RGBLED(6, 7, 8)
+
     WHITE = display.create_pen(255, 255, 255)
     BLACK = display.create_pen(0, 0, 0)
     GREEN = display.create_pen(0, 255, 0)
@@ -62,26 +69,29 @@ if __name__ == '__main__':
     URL = f"https://api.adsb.lol/v2/point/{POS_LAT}/{POS_LONG}/{RADIUS}"
 
     while True:
-        clear_display()
         planes = get_planes()
-        display.set_pen(GREEN)
         nm_to_km = RADIUS * 1.852
-        text = f"Planes around you\n within a {round(nm_to_km)} km radius: {len(planes)}"
-        print(text)
+        text = f"Planes\nwithin a {round(nm_to_km)} km radius: {len(planes)}"
+        clear_display()
+        display.set_pen(GREEN)
         display.text(text, 0, 0, 240, 2)
-        print(planes)
+        print(text)
         Y = 50
         display.set_pen(WHITE)
         if planes:
             for plane in planes:
-                callsign, reg, distance = plane
+                type, callsign, reg, distance, direction = plane
+                distance_in_km = round(distance * 1.852)
                 display.set_pen(CYAN)
-                display.text(callsign, 0, Y, 80, 2)
+                display.text(type, 0, Y, 80, 2)
                 display.set_pen(MAGENTA)
-                display.text(reg, 90, Y, 80, 2)
+                display.text(callsign, 60, Y, 80, 2)
                 display.set_pen(YELLOW)
-                display.text(f"{round(distance * 1.852)} km", 175, Y, 80, 2)
-                print(text)
+                display.text(f"{distance_in_km} km", 140, Y, 80, 2)
+                display.set_pen(WHITE)
+                display.text(f"{round(direction)}°", 205, Y, 80, 2)
+                print(f"{type} | {callsign} | {reg} | {distance_in_km} km | {round(direction)}°")
                 Y += 20
         display.update()
+        print()
         sleep(INTERVAL)
