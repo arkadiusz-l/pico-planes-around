@@ -11,7 +11,6 @@ def clear_display():
     display.set_pen(BLACK)
     display.clear()
     display.update()
-    led.set_rgb(0, 0, 0)
 
 
 def connect_wifi():
@@ -56,6 +55,7 @@ if __name__ == '__main__':
     display.set_font("bitmap8")
 
     led = RGBLED(6, 7, 8)
+    led.set_rgb(0, 0, 0)
 
     WHITE = display.create_pen(255, 255, 255)
     BLACK = display.create_pen(0, 0, 0)
