@@ -42,11 +42,11 @@ def get_planes():
     planes = data['ac']
     planes.sort(key=lambda x: x['dst'])
     for plane in planes:
-        type = plane.get('t', 'empty')
-        callsign = plane.get('flight', 'empty').rstrip()
-        reg = plane.get('r', 'empty')
+        type = plane.get('t', 'unk.')
+        reg = plane.get('r', 'unk.')
+        callsign = plane.get('flight', reg).rstrip()  # if no callsign, shows reg
         distance = plane.get('dst', '999')  # planes without "dst" will be at the end of the list after sorting
-        direction = plane.get('dir', 'empty')
+        direction = plane.get('dir', 'unk.')
         planes_around.append((type, callsign, reg, distance, direction))
     return planes_around
 
