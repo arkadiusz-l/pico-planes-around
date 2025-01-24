@@ -33,7 +33,7 @@ def get_planes():
     data = {}
     planes_around = []
     try:
-        response = urequests.get(URL)
+        response = urequests.get(API)
         data = response.json()
         response.close()
     except Exception as e:
@@ -66,7 +66,7 @@ if __name__ == '__main__':
 
     connect_wifi()
 
-    URL = f"https://api.adsb.lol/v2/point/{POS_LAT}/{POS_LONG}/{RADIUS}"
+    API = f"https://api.adsb.lol/v2/point/{POS_LAT}/{POS_LONG}/{RADIUS}"
 
     while True:
         planes = get_planes()
