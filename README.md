@@ -1,7 +1,7 @@
+![screenshot1](https://github.com/user-attachments/assets/4bd064ff-7e28-4803-ae36-714b82b39cfe)
 # Planes Around with Raspberry Pi Pico
 This application was previously created in August 2024 in order to improve my programming skills and shows planes in the terminal.\
-Now I have rewritten the code to run in [MicroPython](https://micropython.org/) on [Raspberry Pi Pico W](https://www.raspberrypi.com/products/raspberry-pi-pico/?variant=raspberry-pi-pico-w) with [Pimoroni Pico Display Pack](https://shop.pimoroni.com/products/pico-display-pack?variant=32368664215635).
-
+Now I have rewritten the code to run in [MicroPython](https://micropython.org/) on [Raspberry Pi Pico W](https://www.raspberrypi.com/products/raspberry-pi-pico/?variant=raspberry-pi-pico-w) with [Pimoroni Pico Display Pack](https://shop.pimoroni.com/products/pico-display-pack?variant=32368664215635).\
 It uses free [adsb.lol API](https://api.adsb.lol/docs).
 
 ## Description
