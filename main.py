@@ -1,10 +1,28 @@
 import network
 from utime import sleep
-from pimoroni import RGBLED
-from picographics import PicoGraphics, DISPLAY_PICO_DISPLAY, PEN_P4
+from time import localtime
+import uasyncio as asyncio
 import urequests
+from pimoroni import RGBLED
+from machine import Pin
+from picographics import PicoGraphics, DISPLAY_PICO_DISPLAY, PEN_P4
 from wifi_config import SSID, KEY, IP, MASK, GATEWAY, DNS
 from config import POS_LAT, POS_LONG, RADIUS, INTERVAL
+
+
+async def handle_button():
+    button_pressed = False
+    while True:
+        if not button_pressed:
+            if button_a.value() == 0:  # if button pressed
+                button_pressed = True
+                await show_all_planes(planes_around=planes_around)
+            elif button_b.value() == 0:  # if button pressed
+                button_pressed = True
+                await show_planes_details(planes_around=planes_around)
+        if button_a.value() == 1 and button_b.value() == 1:  # if button not pressed
+            button_pressed = False
+        await asyncio.sleep(0.1)
 
 
 def clear_display():
@@ -18,7 +36,6 @@ def connect_wifi():
     wlan.active(True)
     wlan.connect(SSID, KEY)
     wlan.ifconfig((IP, MASK, GATEWAY, DNS))
-    wlan.ifconfig()
 
     if wlan.isconnected():
         print('Successfully connected to the Wi-Fi')
@@ -28,26 +45,98 @@ def connect_wifi():
         sleep(1)
 
 
-def get_planes():
+async def show_all_planes(planes_around):
+    while True:
+        planes_around.clear()
+        print("Downloading data from API...")
+        new_planes = get_planes(api=API)
+        print(f"Data downloaded from API, date: {localtime()}")
+        if new_planes:
+            for plane in new_planes:
+                type = plane.get('t', 'unk.')
+                reg = plane.get('r', 'unk.')
+                callsign = plane.get('flight', reg).rstrip()  # if no callsign, shows reg
+                distance = plane.get('dst', '999')  # planes without "dst" will be at the end of the list after sorting
+                direction = plane.get('dir', 'unk.')
+                planes_around.append((type, callsign, reg, distance, direction))
+        show_planes(planes_to_show=planes_around)
+        await asyncio.sleep(INTERVAL)
+
+
+async def show_planes_details(planes_around):
+    if planes_around:
+        clear_display()
+        plane = planes_around[0]
+        type, callsign, reg, distance, direction = plane
+        data_to_display = [
+            (f"Type:   {type}", CYAN),
+            (f"Callsign:   {callsign}", MAGENTA),
+            (f"Reg:   {reg}", WHITE),
+            (f"Distance:   {round(distance * 1.852)} km", YELLOW)
+        ]
+
+        start_y = 20
+        line_spacing = 20
+        for index, (text, color) in enumerate(data_to_display):
+            y = start_y + index * line_spacing
+            display.set_pen(color)
+            display.text(text, 0, y, 240, 2)
+        display.update()
+        print(plane)
+    display.set_pen(MAGENTA)
+    display.text("No planes!", 20, 100, 240, 2)
+
+
+def get_planes(api):
     data = {}
-    planes_around = []
+    planes_all_data = []
     try:
-        response = urequests.get(API)
+        response = urequests.get(api)
         data = response.json()
         response.close()
     except Exception as e:
         print("An error occurred while connecting to the API:", e)
 
-    planes = data['ac']
-    planes.sort(key=lambda x: x['dst'])
-    for plane in planes:
-        type = plane.get('t', 'unk.')
-        reg = plane.get('r', 'unk.')
-        callsign = plane.get('flight', reg).rstrip()  # if no callsign, shows reg
-        distance = plane.get('dst', '999')  # planes without "dst" will be at the end of the list after sorting
-        direction = plane.get('dir', 'unk.')
-        planes_around.append((type, callsign, reg, distance, direction))
-    return planes_around
+    try:
+        planes_all_data = data.get('ac')
+        planes_all_data.sort(key=lambda x: x['dst'])
+    except Exception as e:
+        print("An error occurred:", e)
+
+    return planes_all_data
+
+
+def show_planes(planes_to_show):
+    nm_to_km = RADIUS * 1.852
+    text = f"Planes\nwithin a {round(nm_to_km)} km radius: {len(planes_to_show)}"
+    clear_display()
+    display.set_pen(GREEN)
+    display.text(text, 0, 0, 240, 2)
+    print(text)
+    Y = 50
+    display.set_pen(WHITE)
+
+    if planes_to_show:
+        for plane in planes_to_show:
+            type, callsign, reg, distance, direction = plane
+            distance_in_km = round(distance * 1.852)
+            display.set_pen(CYAN)
+            display.text(type, 0, Y, 80, 2)
+            display.set_pen(MAGENTA)
+            display.text(callsign, 60, Y, 80, 2)
+            display.set_pen(YELLOW)
+            display.text(f"{distance_in_km} km", 140, Y, 80, 2)
+            display.set_pen(WHITE)
+            display.text(f"{round(direction)}°", 205, Y, 80, 2)
+            print(f"{type} | {callsign} | {reg} | {distance_in_km} km | {round(direction)}°")
+            Y += 20
+    display.update()
+    print()
+
+
+async def main():
+    await asyncio.gather(show_all_planes(planes_around=planes_around), handle_button())
+
 
 if __name__ == '__main__':
     display = PicoGraphics(display=DISPLAY_PICO_DISPLAY, pen_type=PEN_P4, rotate=0)
@@ -56,6 +145,9 @@ if __name__ == '__main__':
 
     led = RGBLED(6, 7, 8)
     led.set_rgb(0, 0, 0)
+
+    button_a = Pin(12, Pin.IN, Pin.PULL_UP)
+    button_b = Pin(13, Pin.IN, Pin.PULL_UP)
 
     WHITE = display.create_pen(255, 255, 255)
     BLACK = display.create_pen(0, 0, 0)
@@ -67,31 +159,8 @@ if __name__ == '__main__':
     connect_wifi()
 
     API = f"https://api.adsb.lol/v2/point/{POS_LAT}/{POS_LONG}/{RADIUS}"
-
-    while True:
-        planes = get_planes()
-        nm_to_km = RADIUS * 1.852
-        text = f"Planes\nwithin a {round(nm_to_km)} km radius: {len(planes)}"
-        clear_display()
-        display.set_pen(GREEN)
-        display.text(text, 0, 0, 240, 2)
-        print(text)
-        Y = 50
-        display.set_pen(WHITE)
-        if planes:
-            for plane in planes:
-                type, callsign, reg, distance, direction = plane
-                distance_in_km = round(distance * 1.852)
-                display.set_pen(CYAN)
-                display.text(type, 0, Y, 80, 2)
-                display.set_pen(MAGENTA)
-                display.text(callsign, 60, Y, 80, 2)
-                display.set_pen(YELLOW)
-                display.text(f"{distance_in_km} km", 140, Y, 80, 2)
-                display.set_pen(WHITE)
-                display.text(f"{round(direction)}°", 205, Y, 80, 2)
-                print(f"{type} | {callsign} | {reg} | {distance_in_km} km | {round(direction)}°")
-                Y += 20
-        display.update()
-        print()
-        sleep(INTERVAL)
+    planes_around = []
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Finished")
