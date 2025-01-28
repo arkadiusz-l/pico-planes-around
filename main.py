@@ -68,7 +68,8 @@ async def show_all_planes(planes_around):
                 callsign = plane.get('flight', reg).rstrip()  # if no callsign, shows reg
                 distance = plane.get('dst', '999')  # planes without "dst" will be at the end of the list after sorting
                 direction = plane.get('dir', 'unk.')
-                planes_around.append((type, callsign, reg, distance, direction))
+                altitude = plane.get('alt_baro', '-')
+                planes_around.append((type, callsign, reg, altitude, direction, distance))
         show_planes(planes_to_show=planes_around)
         await asyncio.sleep(INTERVAL)
 
@@ -77,11 +78,13 @@ async def show_planes_details(planes_around):
     if planes_around:
         clear_display()
         plane = planes_around[0]
-        type, callsign, reg, distance, direction = plane
+        type, callsign, reg, altitude, direction, distance = plane
         data_to_display = [
             (f"Type:   {type}", CYAN),
             (f"Callsign:   {callsign}", MAGENTA),
             (f"Reg:   {reg}", WHITE),
+            (f"Altitude:   {altitude} ft", GREEN),
+            (f"Direction:   {direction}°", CYAN),
             (f"Distance:   {round(distance * 1.852)} km", YELLOW)
         ]
 
@@ -120,7 +123,7 @@ def show_planes(planes_to_show):
     nm_to_km = RADIUS * 1.852
     text = f"Planes\nwithin a {round(nm_to_km)} km radius: {len(planes_to_show)}"
     clear_display()
-    display.set_pen(GREEN)
+    display.set_pen(WHITE)
     display.text(text, 0, 0, 240, 2)
     print(text)
     Y = 50
@@ -128,16 +131,19 @@ def show_planes(planes_to_show):
 
     if planes_to_show:
         for plane in planes_to_show:
-            type, callsign, reg, distance, direction = plane
+            type, callsign, reg, altitude, direction, distance = plane
             distance_in_km = round(distance * 1.852)
+            altitude = round(altitude / 100)
             display.set_pen(CYAN)
             display.text(type, 0, Y, 80, 2)
             display.set_pen(MAGENTA)
-            display.text(callsign, 60, Y, 80, 2)
+            display.text(callsign, 53, Y, 80, 2)
+            display.set_pen(BLUE)
+            display.text(f"{altitude:03d}", 135, Y, 80, 2)
+            display.set_pen(GREEN)
+            display.text(f"{round(direction)}°", 177, Y, 80, 2)
             display.set_pen(YELLOW)
-            display.text(f"{distance_in_km} km", 140, Y, 80, 2)
-            display.set_pen(WHITE)
-            display.text(f"{round(direction)}°", 205, Y, 80, 2)
+            display.text(f"{distance_in_km}", 222, Y, 80, 2)
             print(f"{type} | {callsign} | {reg} | {distance_in_km} km | {round(direction)}°")
             Y += 20
     display.update()
@@ -163,6 +169,7 @@ if __name__ == '__main__':
     BLACK = display.create_pen(0, 0, 0)
     GREEN = display.create_pen(0, 255, 0)
     CYAN = display.create_pen(0, 255, 255)
+    BLUE = display.create_pen(0, 200, 255)
     MAGENTA = display.create_pen(255, 0, 255)
     YELLOW = display.create_pen(255, 255, 0)
 
