@@ -19,14 +19,22 @@ def change_views(views):
 async def handle_button(views):
     button_pressed = False
     view_generator = change_views(views=views)
-    next(view_generator)  # generator loads the second in order functions from `Views` (because 1 is already load while starting the program) to call it below after pressing the button
+    current_view = next(view_generator)  # generator loads the first in order functions from `Views`
+    active_view_task = asyncio.create_task(current_view(planes_around=planes_around))  # runs first view
 
     while True:
         if not button_pressed:
             if button_a.value() == 0:  # if button pressed
                 button_pressed = True
-                current_view = next(view_generator)  # stores references to the function
-                await current_view(planes_around=planes_around)  # calls one of the functions from the "Views" and inserts the argument in it
+
+                if active_view_task:
+                    active_view_task.cancel()
+                    try:
+                        await active_view_task
+                    except asyncio.CancelledError:
+                        pass
+                current_view = next(view_generator)  # generator loads the second in order functions from `Views`
+                active_view_task = asyncio.create_task(current_view(planes_around=planes_around))  # runs next view from `Views`
             elif button_b.value() == 0:  # if button pressed
                 button_pressed = True
                 pass
@@ -56,26 +64,29 @@ def connect_wifi():
 
 
 async def show_all_planes(planes_around):
-    while True:
-        planes_around.clear()
-        print("Downloading data from API...")
-        new_planes = get_planes(api=API)
-        print(f"Data downloaded from API, date: {localtime()}")
-        if new_planes:
-            for plane in new_planes:
-                type = plane.get('t', 'unk.')
-                reg = plane.get('r', 'unk.')
-                callsign = plane.get('flight', reg).rstrip()  # if no callsign, shows reg
-                distance = plane.get('dst', '999')  # planes without "dst" will be at the end of the list after sorting
-                direction = plane.get('dir', 'unk.')
-                altitude = plane.get('alt_baro', '-')
-                planes_around.append((type, callsign, reg, altitude, direction, distance))
-        show_planes(planes_to_show=planes_around)
-        await asyncio.sleep(INTERVAL)
-
+    try:
+        while True:
+            planes_around.clear()
+            print("Downloading data from API...")
+            new_planes = get_planes(api=API)
+            print(f"Data downloaded from API, date: {localtime()}")
+            if new_planes:
+                for plane in new_planes:
+                    type = plane.get('t', 'unk.')
+                    reg = plane.get('r', 'unk.')
+                    callsign = plane.get('flight', reg).rstrip()  # if no callsign, shows reg
+                    distance = plane.get('dst', '999')  # planes without "dst" will be at the end of the list after sorting
+                    direction = plane.get('dir', 'unk.')
+                    altitude = plane.get('alt_baro', '-')
+                    planes_around.append((type, callsign, reg, altitude, direction, distance))
+            show_planes(planes_to_show=planes_around)
+            await asyncio.sleep(INTERVAL)
+    except asyncio.CancelledError:
+        raise  # propagation of the exception to `handle_button()`
 
 async def show_planes_details(planes_around):
     clear_display()
+    font_size = 2
     if planes_around:
 
         def generate_details(plane):
@@ -93,12 +104,12 @@ async def show_planes_details(planes_around):
         for line_index, (text, pen_color) in enumerate(generate_details(plane)):
             y = start_y + line_index * line_spacing
             display.set_pen(pen_color)
-            display.text(text, 0, y, 240, 2)
+            display.text(text, 0, y, 240, font_size)
         display.update()
         print(plane)
     else:
         display.set_pen(MAGENTA)
-        display.text("No planes!", 0, 0, 240, 2)
+        display.text("No planes!", 0, 0, 240, font_size)
         display.update()
 
 
@@ -138,8 +149,8 @@ def show_planes(planes_to_show):
             direction_rounded = round(direction)
 
             yield type, CYAN, 0, y
-            yield callsign, MAGENTA, 53, y
-            yield f"{altitude_rounded:03d}", BLUE, 135, y
+            yield callsign, MAGENTA, 56, y
+            yield f"{altitude_rounded:03d}", BLUE, 136, y
             yield f"{direction_rounded}°", GREEN, 177, y
             yield f"{distance_in_km}", YELLOW, 222, y
             y += 20
@@ -154,7 +165,7 @@ def show_planes(planes_to_show):
 
 
 async def main():
-    await asyncio.gather(show_all_planes(planes_around=planes_around), handle_button(views=views))
+    await asyncio.gather(handle_button(views=views))
 
 
 if __name__ == '__main__':
