@@ -10,16 +10,26 @@ from wifi_config import SSID, KEY, IP, MASK, GATEWAY, DNS
 from config import POS_LAT, POS_LONG, RADIUS, INTERVAL
 
 
-async def handle_button():
+def change_views(views):
+    while True:
+        for view in views:
+            yield view
+
+
+async def handle_button(views):
     button_pressed = False
+    view_generator = change_views(views=views)
+    next(view_generator)  # generator loads the second in order functions from `Views` (because 1 is already load while starting the program) to call it below after pressing the button
+
     while True:
         if not button_pressed:
             if button_a.value() == 0:  # if button pressed
                 button_pressed = True
-                await show_all_planes(planes_around=planes_around)
+                current_view = next(view_generator)  # stores references to the function
+                await current_view(planes_around=planes_around)  # calls one of the functions from the "Views" and inserts the argument in it
             elif button_b.value() == 0:  # if button pressed
                 button_pressed = True
-                await show_planes_details(planes_around=planes_around)
+                pass
         if button_a.value() == 1 and button_b.value() == 1:  # if button not pressed
             button_pressed = False
         await asyncio.sleep(0.1)
@@ -135,7 +145,7 @@ def show_planes(planes_to_show):
 
 
 async def main():
-    await asyncio.gather(show_all_planes(planes_around=planes_around), handle_button())
+    await asyncio.gather(show_all_planes(planes_around=planes_around), handle_button(views=views))
 
 
 if __name__ == '__main__':
@@ -160,6 +170,7 @@ if __name__ == '__main__':
 
     API = f"https://api.adsb.lol/v2/point/{POS_LAT}/{POS_LONG}/{RADIUS}"
     planes_around = []
+    views = (show_all_planes, show_planes_details)
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
