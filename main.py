@@ -75,29 +75,31 @@ async def show_all_planes(planes_around):
 
 
 async def show_planes_details(planes_around):
+    clear_display()
     if planes_around:
-        clear_display()
-        plane = planes_around[0]
-        type, callsign, reg, altitude, direction, distance = plane
-        data_to_display = [
-            (f"Type:   {type}", CYAN),
-            (f"Callsign:   {callsign}", MAGENTA),
-            (f"Reg:   {reg}", WHITE),
-            (f"Altitude:   {altitude} ft", GREEN),
-            (f"Direction:   {direction}°", CYAN),
-            (f"Distance:   {round(distance * 1.852)} km", YELLOW)
-        ]
 
+        def generate_details(plane):
+            type, callsign, reg, altitude, direction, distance = plane
+            yield f"Type:   {type}", CYAN
+            yield f"Callsign:   {callsign}", MAGENTA
+            yield f"Reg:   {reg}", WHITE
+            yield f"Altitude:   {altitude} ft", GREEN
+            yield f"Direction:   {direction}°", CYAN
+            yield f"Distance:   {round(distance * 1.852, 1)} km", YELLOW
+
+        plane = planes_around[0]
         start_y = 20
         line_spacing = 20
-        for index, (text, color) in enumerate(data_to_display):
-            y = start_y + index * line_spacing
-            display.set_pen(color)
+        for line_index, (text, pen_color) in enumerate(generate_details(plane)):
+            y = start_y + line_index * line_spacing
+            display.set_pen(pen_color)
             display.text(text, 0, y, 240, 2)
         display.update()
         print(plane)
-    display.set_pen(MAGENTA)
-    display.text("No planes!", 20, 100, 240, 2)
+    else:
+        display.set_pen(MAGENTA)
+        display.text("No planes!", 0, 0, 240, 2)
+        display.update()
 
 
 def get_planes(api):
@@ -121,31 +123,32 @@ def get_planes(api):
 
 def show_planes(planes_to_show):
     nm_to_km = RADIUS * 1.852
-    text = f"Planes\nwithin a {round(nm_to_km)} km radius: {len(planes_to_show)}"
+    header_text = f"Planes\nwithin a {round(nm_to_km)} km radius: {len(planes_to_show)}"
     clear_display()
     display.set_pen(WHITE)
-    display.text(text, 0, 0, 240, 2)
-    print(text)
-    Y = 50
-    display.set_pen(WHITE)
+    display.text(header_text, 0, 0, 240, 2)
+    print(header_text)
 
-    if planes_to_show:
+    def generate_display_lines():
+        y = 50
         for plane in planes_to_show:
             type, callsign, reg, altitude, direction, distance = plane
             distance_in_km = round(distance * 1.852)
-            altitude = round(altitude / 100)
-            display.set_pen(CYAN)
-            display.text(type, 0, Y, 80, 2)
-            display.set_pen(MAGENTA)
-            display.text(callsign, 53, Y, 80, 2)
-            display.set_pen(BLUE)
-            display.text(f"{altitude:03d}", 135, Y, 80, 2)
-            display.set_pen(GREEN)
-            display.text(f"{round(direction)}°", 177, Y, 80, 2)
-            display.set_pen(YELLOW)
-            display.text(f"{distance_in_km}", 222, Y, 80, 2)
-            print(f"{type} | {callsign} | {reg} | {distance_in_km} km | {round(direction)}°")
-            Y += 20
+            altitude_rounded = round(altitude / 100)
+            direction_rounded = round(direction)
+
+            yield type, CYAN, 0, y
+            yield callsign, MAGENTA, 53, y
+            yield f"{altitude_rounded:03d}", BLUE, 135, y
+            yield f"{direction_rounded}°", GREEN, 177, y
+            yield f"{distance_in_km}", YELLOW, 222, y
+            y += 20
+            print(f"{type} | {callsign} | {reg} | {altitude_rounded:03d} | {direction_rounded}° | {distance_in_km} km")
+
+    for text, pen_color, x, y in generate_display_lines():
+        display.set_pen(pen_color)
+        display.text(text, x, y, 80, 2)
+
     display.update()
     print()
 
