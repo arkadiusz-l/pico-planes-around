@@ -72,12 +72,12 @@ async def show_all_planes(planes_around):
             print(f"Data downloaded from API, date: {localtime()}")
             if new_planes:
                 for plane in new_planes:
-                    type = plane.get('t', 'unk.')
-                    reg = plane.get('r', 'unk.')
+                    type = plane.get('t', 'unk')
+                    reg = plane.get('r', 'unk')
                     callsign = plane.get('flight', reg).rstrip()  # if no callsign, shows reg
-                    distance = plane.get('dst', '999')  # planes without "dst" will be at the end of the list after sorting
-                    direction = plane.get('dir', 'unk.')
-                    altitude = plane.get('alt_baro', '-')
+                    distance = plane.get('dst', 999)  # planes without "dst" will be at the end of the list after sorting
+                    direction = plane.get('dir', 'unk')
+                    altitude = plane.get('alt_baro', None)
                     planes_around.append((type, callsign, reg, altitude, direction, distance))
             show_planes(planes_to_show=planes_around)
             await asyncio.sleep(INTERVAL)
@@ -144,17 +144,21 @@ def show_planes(planes_to_show):
         y = 50
         for plane in planes_to_show:
             type, callsign, reg, altitude, direction, distance = plane
-            distance_in_km = round(distance * 1.852)
-            altitude_rounded = round(altitude / 100)
+            if altitude:
+                altitude = round(altitude / 100)
+                altitude = f"{altitude:03d}"
+            else:
+                altitude = 'unk'
             direction_rounded = round(direction)
+            distance_in_km = round(distance * 1.852)
 
             yield type, CYAN, 0, y
             yield callsign, MAGENTA, 56, y
-            yield f"{altitude_rounded:03d}", BLUE, 136, y
+            yield f"{altitude}", BLUE, 136, y
             yield f"{direction_rounded}°", GREEN, 177, y
             yield f"{distance_in_km}", YELLOW, 222, y
             y += 20
-            print(f"{type} | {callsign} | {reg} | {altitude_rounded:03d} | {direction_rounded}° | {distance_in_km} km")
+            print(f"{type} | {callsign} | {reg} | {altitude} | {direction_rounded}° | {distance_in_km} km")
 
     for text, pen_color, x, y in generate_display_lines():
         display.set_pen(pen_color)
