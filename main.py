@@ -49,11 +49,11 @@ def clear_display():
     display.update()
 
 
-def connect_wifi():
+def connect_wifi(ip, mask, gateway, dns):
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     wlan.connect(SSID, KEY)
-    wlan.ifconfig((IP, MASK, GATEWAY, DNS))
+    wlan.ifconfig((ip, mask, gateway, dns))
 
     if wlan.isconnected():
         print('Successfully connected to the Wi-Fi')
@@ -67,19 +67,17 @@ async def show_all_planes(planes_around):
     try:
         while True:
             planes_around.clear()
-            print("Downloading data from API...")
             new_planes = get_planes(api=API)
-            print(f"Data downloaded from API, date: {localtime()}")
             if new_planes:
                 for plane in new_planes:
                     type = plane.get('t', 'unk')
                     reg = plane.get('r', 'unk')
                     callsign = plane.get('flight', reg).rstrip()  # if no callsign, shows reg
-                    distance = plane.get('dst', 999)  # planes without "dst" will be at the end of the list after sorting
+                    distance = plane.get('unk')  # planes without `dst` receive infinity (float('inf')) in the get_planes () function
                     direction = plane.get('dir', 'unk')
                     altitude = plane.get('alt_baro', None)
                     planes_around.append((type, callsign, reg, altitude, direction, distance))
-            show_planes(planes_to_show=planes_around)
+                show_planes(planes_to_show=planes_around)
             await asyncio.sleep(INTERVAL)
     except asyncio.CancelledError:
         raise  # propagation of the exception to `handle_button()`
@@ -116,18 +114,23 @@ async def show_planes_details(planes_around):
 def get_planes(api):
     data = {}
     planes_all_data = []
+    response = None
     try:
+        print("Downloading data from API...")
         response = urequests.get(api)
         data = response.json()
-        response.close()
+        print(f"Data downloaded from API, date: {localtime()}")
     except Exception as e:
         print("An error occurred while connecting to the API:", e)
+    finally:
+        if response:
+            response.close()
 
     try:
         planes_all_data = data.get('ac')
-        planes_all_data.sort(key=lambda x: x['dst'])
+        planes_all_data.sort(key=lambda x: x.get('dst', float('inf')))  # planes without "dst" will be at the end of the list after sorting
     except Exception as e:
-        print("An error occurred:", e)
+        print("An error occurred while processing data from the API:", e)
 
     return planes_all_data
 
@@ -191,7 +194,7 @@ if __name__ == '__main__':
     MAGENTA = display.create_pen(255, 0, 255)
     YELLOW = display.create_pen(255, 255, 0)
 
-    connect_wifi()
+    connect_wifi(ip=IP, mask=MASK, gateway=GATEWAY, dns=DNS)
 
     API = f"https://api.adsb.lol/v2/point/{POS_LAT}/{POS_LONG}/{RADIUS}"
     planes_around = []
