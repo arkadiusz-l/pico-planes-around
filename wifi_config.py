@@ -4,3 +4,5 @@ IP = ''
 MASK = ''
 GATEWAY = ''
 DNS = ''
+MAX_ATTEMPTS = 10
+RETRY_DELAY = 5
