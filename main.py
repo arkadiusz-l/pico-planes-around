@@ -4,9 +4,9 @@ from time import localtime
 import uasyncio as asyncio
 import urequests
 from pimoroni import RGBLED
-from machine import Pin
+from machine import Pin, reset
 from picographics import PicoGraphics, DISPLAY_PICO_DISPLAY, PEN_P4
-from wifi_config import SSID, KEY, IP, MASK, GATEWAY, DNS
+from wifi_config import SSID, KEY, IP, SUBNET, GATEWAY, DNS, MAX_ATTEMPTS, RETRY_DELAY
 from config import POS_LAT, POS_LONG, RADIUS, INTERVAL
 
 
@@ -49,18 +49,40 @@ def clear_display():
     display.update()
 
 
-def connect_wifi(ip, mask, gateway, dns):
+def connect_wifi(ssid, key, ip=None, subnet=None, gateway=None, dns=None, max_attempts=10, retry_delay=5):
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
-    wlan.connect(SSID, KEY)
-    wlan.ifconfig((ip, mask, gateway, dns))
+    attempt = 0
+    while not wlan.isconnected() and attempt < max_attempts:
+        if attempt == MAX_ATTEMPTS // 2:
+            print("WLAN interface restart")
+            wlan.disconnect()
+            wlan.active(False)
+            sleep(2)
+            wlan.active(True)
+        print(f"Connecting to the Wi-Fi... Attempt {attempt + 1}/{max_attempts}")
+        try:
+            wlan.connect(ssid, key)
+        except OSError as e:
+            print("Wi-Fi configuration error:", e)
+            return
+        sleep(retry_delay)
+        attempt += 1
 
     if wlan.isconnected():
-        print('Successfully connected to the Wi-Fi')
+        if ip:
+            wlan.ifconfig((ip, subnet, gateway, dns))
+            print('Successfully connected to the Wi-Fi')
+        return
+    else:
+        print(f"All attempts failed")
+        reset_device()
 
-    while not wlan.isconnected():
-        print('Connecting to a Wi-Fi...')
-        sleep(1)
+
+def reset_device():
+    print("Resetting Pico...")
+    sleep(2)
+    reset()
 
 
 async def show_all_planes(planes_around):
@@ -77,7 +99,7 @@ async def show_all_planes(planes_around):
                     direction = plane.get('dir', 'unk')
                     altitude = plane.get('alt_baro', None)
                     planes_around.append((type, callsign, reg, altitude, direction, distance))
-                show_planes(planes_to_show=planes_around)
+            show_planes(planes_to_show=planes_around)
             await asyncio.sleep(INTERVAL)
     except asyncio.CancelledError:
         raise  # propagation of the exception to `handle_button()`
@@ -117,20 +139,24 @@ def get_planes(api):
     response = None
     try:
         print("Downloading data from API...")
-        response = urequests.get(api)
+        response = urequests.get(api, timeout=5)
         data = response.json()
         print(f"Data downloaded from API, date: {localtime()}")
     except Exception as e:
         print("An error occurred while connecting to the API:", e)
+        connect_wifi(
+            ssid=SSID, key=KEY, ip=IP, subnet=SUBNET, gateway=GATEWAY, dns=DNS, max_attempts=MAX_ATTEMPTS,
+                     retry_delay=RETRY_DELAY
+        )
+
     finally:
         if response:
             response.close()
-
-    try:
-        planes_all_data = data.get('ac')
-        planes_all_data.sort(key=lambda x: x.get('dst', float('inf')))  # planes without "dst" will be at the end of the list after sorting
-    except Exception as e:
-        print("An error occurred while processing data from the API:", e)
+            try:
+                planes_all_data = data.get('ac', [])
+                planes_all_data.sort(key=lambda x: x.get('dst', float('inf')))  # planes without "dst" will be at the end of the list after sorting
+            except Exception as e:
+                print("An error occurred while processing data from the API:", e)
 
     return planes_all_data
 
@@ -194,7 +220,7 @@ if __name__ == '__main__':
     MAGENTA = display.create_pen(255, 0, 255)
     YELLOW = display.create_pen(255, 255, 0)
 
-    connect_wifi(ip=IP, mask=MASK, gateway=GATEWAY, dns=DNS)
+    connect_wifi(ssid=SSID, key=KEY, ip=IP, subnet=SUBNET, gateway=GATEWAY, dns=DNS, max_attempts=MAX_ATTEMPTS, retry_delay=RETRY_DELAY)
 
     API = f"https://api.adsb.lol/v2/point/{POS_LAT}/{POS_LONG}/{RADIUS}"
     planes_around = []
@@ -203,4 +229,4 @@ if __name__ == '__main__':
         asyncio.run(main())
     except KeyboardInterrupt:
         print("Finished")
-        display.clear()  # only works on IDE-triggered program termination
+        clear_display()  # only works on IDE-triggered program termination
